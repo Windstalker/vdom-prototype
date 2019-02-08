@@ -12,6 +12,92 @@ function isDefined(node) {
   return node !== null && node !== undefined;
 }
 
+function isCustomProp(name) {
+  // stub
+  return false;
+}
+
+function setBooleanProp($el, name, value) {
+  if (value) {
+    $el.setAttribute(name, value);
+    $el[name] = true;
+  } else {
+    $el[name] = false;
+  }
+}
+
+function removeBooleanProp($el, name) {
+  $el.removeAttribute(name);
+  $el[name] = false;
+}
+
+function setProp($el, name, value) {
+  if (isCustomProp(name)) {
+    return;
+  }
+
+  if (name.indexOf("on") === 0 && typeof value === "function") {
+    // let eventName = prop.slice(2);
+    // $el.addEventListener(eventName, value, false);
+  } else {
+    if (typeof value === "boolean") {
+      return setBooleanProp($el, name, value);
+    }
+
+    if (name === "className") {
+      name = "class";
+    }
+
+    $el.setAttribute(name, value);
+  }
+}
+
+function removeProp($el, name, value) {
+  if (isCustomProp(name)) {
+    return;
+  }
+
+  if (name.indexOf("on") === 0 && typeof value === "function") {
+    // let eventName = prop.slice(2);
+    // $el.removeEventListener(eventName, value, false);
+  } else {
+    if (typeof value === "boolean") {
+      return removeBooleanProp($el, name);
+    }
+
+    if (name === "className") {
+      name = "class";
+    }
+
+    $el.removeAttribute(name);
+  }
+}
+
+function updateProp($el, name, newValue, oldValue) {
+  if (!newValue) {
+    return removeProp($el, name, oldValue);
+  }
+
+  if (!oldValue || (newValue && newValue !== oldValue)) {
+    return setProp($el, name, newValue);
+  }
+}
+
+function setProps($el, props = {}) {
+  for (let prop of Object.keys(props)) {
+    let value = props[prop];
+    setProp($el, prop, value);
+  }
+}
+
+function updateProps($el, newProps = {}, oldProps = {}) {
+  const mergedProps = { ...oldProps, ...newProps };
+
+  Object.keys(mergedProps).forEach(propName => {
+    updateProp($el, newProps[propName], oldProps[propName]);
+  });
+}
+
 const VDOM = {
   treeState: null,
   node(tagName, props = {}, children = []) {
@@ -27,29 +113,15 @@ const VDOM = {
       return document.createTextNode(text);
     }
 
-    const nodeEl = document.createElement(node.tagName);
+    const $el = document.createElement(node.tagName);
 
-    for (let prop of Object.keys(node.props)) {
-      let value = node.props[prop];
-
-      if (prop.indexOf("on") === 0 && typeof value === "function") {
-        let eventName = prop.slice(2);
-
-        nodeEl.addEventListener(eventName, value, false);
-      } else {
-        if (prop === "className") {
-          prop = "class";
-        }
-
-        nodeEl.setAttribute(prop, value);
-      }
-    }
+    setProps($el, node.props);
 
     for (let childNode of node.children) {
-      nodeEl.appendChild(this.createElement(childNode));
+      $el.appendChild(this.createElement(childNode));
     }
 
-    return nodeEl;
+    return $el;
   },
   hasChanged(newNode, oldNode) {
     if (
@@ -88,6 +160,8 @@ const VDOM = {
     }
 
     if (newNode.tagName) {
+      updateProps($parent.childNodes[index], newNode.props, oldNode.props);
+
       const oldLength = oldNode.children.length;
       const newLength = newNode.children.length;
 
@@ -104,8 +178,8 @@ const VDOM = {
 };
 
 let tree = VDOM.node("ul", { className: "list" }, [
-  VDOM.node("li", { className: "item" }, "Item 1"),
-  VDOM.node("li", { className: "item" }, "Item 2")
+  VDOM.node("li", { className: "item" }, ["Item 1"]),
+  VDOM.node("li", { className: "item" }, ["Item 2"])
 ]);
 
 const rootEl = document.querySelector("#root");
@@ -116,9 +190,12 @@ VDOM.render(rootEl, tree);
 VDOM.render(
   rootEl,
   VDOM.node("ul", { className: "list" }, [
-    VDOM.node("li", { className: "item" }, "Item 1"),
-    VDOM.node("li", { className: "item" }, "Item 2"),
-    VDOM.node("li", { className: "item" }, "Item 3")
+    VDOM.node("li", { className: "item" }, ["Item 1"]),
+    VDOM.node("li", { className: "item super" }, ["Item 2"]),
+    VDOM.node("li", { className: "item" }, [
+      VDOM.node("input", { type: "checkbox", value: "Test", checked: true }),
+      VDOM.node("input", { type: "text", value: "Test", disabled: true })
+    ])
   ]),
   tree
 );
