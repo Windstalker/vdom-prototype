@@ -205,10 +205,10 @@ let tree = VDOM.node("ul", { className: "list" }, [
     { className: "item", onClick: () => alert("click handler!") },
     ["Item 2"]
   ),
-  VDOM.node("button", { onClick: secondRender }, ["Click to change tree"])
+  VDOM.node("button", { onClick: updateTree }, ["Click to change tree"])
 ]);
 
-function secondRender() {
+function updateTree() {
   // 2nd render (update)
   VDOM.render(
     rootEl,
