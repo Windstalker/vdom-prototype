@@ -12,9 +12,18 @@ function isDefined(node) {
   return node !== null && node !== undefined;
 }
 
-function isCustomProp(name) {
-  // stub
-  return false;
+function isCustomProp(name, value) {
+  return isEventProp(name, value);
+}
+
+function isEventProp(name, handler) {
+  return (
+    name.indexOf("on") === 0 && (!handler || typeof handler === "function")
+  );
+}
+
+function getEventName(propName = "") {
+  return propName.slice(2).toLowerCase();
 }
 
 function setBooleanProp($el, name, value) {
@@ -31,54 +40,64 @@ function removeBooleanProp($el, name) {
   $el[name] = false;
 }
 
+function addListener($el, name, handler) {
+  $el.addEventListener(getEventName(name), handler, false);
+}
+
+function removeListener($el, name, handler) {
+  $el.removeEventListener(getEventName(name), handler, false);
+}
+
 function setProp($el, name, value) {
-  if (isCustomProp(name)) {
+  if (isCustomProp(name, value)) {
     return;
   }
 
-  if (name.indexOf("on") === 0 && typeof value === "function") {
-    // let eventName = prop.slice(2);
-    // $el.addEventListener(eventName, value, false);
-  } else {
-    if (typeof value === "boolean") {
-      return setBooleanProp($el, name, value);
-    }
-
-    if (name === "className") {
-      name = "class";
-    }
-
-    $el.setAttribute(name, value);
+  if (typeof value === "boolean") {
+    return setBooleanProp($el, name, value);
   }
+
+  if (name === "className") {
+    name = "class";
+  }
+
+  $el.setAttribute(name, value);
 }
 
 function removeProp($el, name, value) {
-  if (isCustomProp(name)) {
+  if (isCustomProp(name, value)) {
     return;
   }
 
-  if (name.indexOf("on") === 0 && typeof value === "function") {
-    // let eventName = prop.slice(2);
-    // $el.removeEventListener(eventName, value, false);
-  } else {
-    if (typeof value === "boolean") {
-      return removeBooleanProp($el, name);
-    }
-
-    if (name === "className") {
-      name = "class";
-    }
-
-    $el.removeAttribute(name);
+  if (typeof value === "boolean") {
+    return removeBooleanProp($el, name);
   }
+
+  if (name === "className") {
+    name = "class";
+  }
+
+  $el.removeAttribute(name);
 }
 
 function updateProp($el, name, newValue, oldValue) {
   if (!newValue) {
+    if (isEventProp(name, oldValue)) {
+      removeListener($el, name, oldValue);
+    }
+
     return removeProp($el, name, oldValue);
   }
 
   if (!oldValue || (newValue && newValue !== oldValue)) {
+    if (isEventProp(name, newValue)) {
+      if (oldValue) {
+        removeListener($el, name, oldValue);
+      }
+
+      addListener($el, name, newValue);
+    }
+
     return setProp($el, name, newValue);
   }
 }
@@ -86,6 +105,9 @@ function updateProp($el, name, newValue, oldValue) {
 function setProps($el, props = {}) {
   for (let prop of Object.keys(props)) {
     let value = props[prop];
+    if (isEventProp(prop, value)) {
+      addListener($el, prop, value);
+    }
     setProp($el, prop, value);
   }
 }
@@ -99,7 +121,6 @@ function updateProps($el, newProps = {}, oldProps = {}) {
 }
 
 const VDOM = {
-  treeState: null,
   node(tagName, props = {}, children = []) {
     return {
       tagName,
@@ -179,23 +200,38 @@ const VDOM = {
 
 let tree = VDOM.node("ul", { className: "list" }, [
   VDOM.node("li", { className: "item" }, ["Item 1"]),
-  VDOM.node("li", { className: "item" }, ["Item 2"])
+  VDOM.node(
+    "li",
+    { className: "item", onClick: () => alert("click handler!") },
+    ["Item 2"]
+  ),
+  VDOM.node("button", { onClick: secondRender }, ["Click to change tree"])
 ]);
+
+function secondRender() {
+  // 2nd render (update)
+  VDOM.render(
+    rootEl,
+    VDOM.node("ul", { className: "list" }, [
+      VDOM.node("li", { className: "item" }, ["Item 1"]),
+      VDOM.node(
+        "li",
+        {
+          className: "item super",
+          onClick: () => alert("another click handler!")
+        },
+        ["Item 2"]
+      ),
+      VDOM.node("li", { className: "item" }, [
+        VDOM.node("input", { type: "checkbox", value: "Test", checked: true }),
+        VDOM.node("input", { type: "text", value: "Test", disabled: true })
+      ])
+    ]),
+    tree
+  );
+}
 
 const rootEl = document.querySelector("#root");
 
 // 1st render
 VDOM.render(rootEl, tree);
-// 2nd render (update)
-VDOM.render(
-  rootEl,
-  VDOM.node("ul", { className: "list" }, [
-    VDOM.node("li", { className: "item" }, ["Item 1"]),
-    VDOM.node("li", { className: "item super" }, ["Item 2"]),
-    VDOM.node("li", { className: "item" }, [
-      VDOM.node("input", { type: "checkbox", value: "Test", checked: true }),
-      VDOM.node("input", { type: "text", value: "Test", disabled: true })
-    ])
-  ]),
-  tree
-);
